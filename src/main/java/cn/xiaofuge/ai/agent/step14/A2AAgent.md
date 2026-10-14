@@ -292,6 +292,89 @@ Linux Foundation 自己列的 A2A 未解决问题清单：
 
 ---
 
+## 跑一遍：把「找外包公司」走完全程
+
+### 把比喻钉死（贯穿全篇的那条线）
+
+**黄页 → 名片 → 下单 → 拿工单号**，就是这篇的全部：
+
+| 代码里 | 现实里 |
+|---|---|
+| 你（发起方） | **要找外包的甲方** |
+| `DIRECTORY`（`A2AAgent.java:49`） | **一本黄页**（模拟"网上已注册的代理"） |
+| `AgentCard` | **名片** —— 我叫什么、住哪个 URL、会什么技能 |
+| `discover()` | **翻黄页** —— 一次拉回所有名片 |
+| `send(agent, task)` | **照名片上的号码打过去下单** |
+| `task_id` | **工单号** —— `task-001-a3f2` |
+| `tasks`（那个 Map） | **你自己的订单簿** —— 记着发过哪些单 |
+| `submitted → working → completed` | **工单状态** —— 已受理 → 处理中 → 完成 |
+| `handleRemotely()`（`A2AAgent.java:135`） | **对方公司内部怎么干的** —— **你不需要知道** |
+
+**这张表里最重要的是最后一行**：对方怎么实现，你**完全不管**，你只认 `task_id` 和回执。**这正是「协议」的全部价值。**
+
+### 走一遍
+
+**输入：`"让翻译代理把「你好，智能体」翻译成英文"`**
+
+**第 1 轮 · 主代理决定派单（`A2AAgent.java:74-85`）**
+
+```java
+model.chat([system(你是 ToyAgent 主代理，可通过 A2A 协议与外部代理协作...),
+            user("让翻译代理把「你好，智能体」翻译成英文")])
+// 模型返回：{"tool": "a2a_send", "agent": "translator", "task": "把「你好，智能体」翻译成英文"}
+
+tool = "a2a_send"   → 走 send("translator", "把「你好，智能体」翻译成英文")
+```
+
+**进 `send()` —— 照名片下单（`A2AAgent.java:113-132`）**
+
+```java
+AgentCard card = DIRECTORY.get("translator");     // 翻黄页，拿到名片
+// card = translator / http://a2a.local/translator / 1.0.0 / [translate]
+
+String taskId = "task-001-a3f2";                  // 生成工单号
+tasks.put(taskId, "translator: 把「你好，智能体」翻译成英文");   // 记进订单簿
+
+// 状态机 submitted → working
+String reply = handleRemotely(card, task);
+// 对方按 card.name() 处理 → "翻译结果（模拟远端模型）：Hello, Agent."
+
+// 回执 completed
+return {"task_id": "task-001-a3f2", "status": "completed",
+        "result": "翻译结果（模拟远端模型）：Hello, Agent."}
+```
+
+**第 2 轮 · 主代理汇总（`A2AAgent.java:78-89`）**
+
+```java
+messages.add(Message.user("工具执行结果: {\"task_id\": \"task-001-a3f2\", \"status\": \"completed\", ...}"))
+raw = model.chat(messages)     // 模型看到回执，用自然语言作答
+// → "翻译代理返回：「你好，智能体」的英文是 Hello, Agent。"
+return raw;
+```
+
+**如果没先发现名片就下单**（`A2AAgent.java:114-119`）：
+
+```java
+DIRECTORY.get("不存在的代理")  → null
+→ "{\"error\": \"unknown agent: ...\"}"     // 路由失败，轨迹里记一笔 guard
+```
+
+### 订单簿长什么样
+
+跑几次之后，`tasks` 这个 Map 里躺着（`A2AAgent.java:121`）：
+
+```java
+{
+  "task-001-a3f2" : "translator: 把「你好，智能体」翻译成英文",
+  "task-002-7b1c" : "weather: 明天适合户外运动吗"
+}
+```
+
+**`reset()` 会把订单簿清零**（`A2AAgent.java:150-153`）—— 这就是教学代码里没有「持久化」的地方：真实系统里这本订单簿在数据库里，而且**能被另一个进程查到**。
+
+---
+
 ## 落脚：回到这份代码
 
 `DIRECTORY`（`A2AAgent.java:49`）是**黄页 + 名片库二合一** —— 它既扮演黄页（列出有哪些 agent），又存着名片本体（url、skills）。这是教学简化：真实里这两件事分属注册中心和对方域名下的 `/.well-known/agent.json`。
