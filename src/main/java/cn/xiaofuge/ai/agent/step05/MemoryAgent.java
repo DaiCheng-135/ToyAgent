@@ -16,6 +16,20 @@ import java.util.Map;
  * 滑动窗口 + 摘要，就是上下文工程（Context Engineering）的基础盘。
  * <p>
  * 记忆的本质不是数据库，而是：每一次请求，都带上该带的历史。
+ * <p>
+ * 代码流程（{@link Impl#chat(String)}）：
+ * <pre>
+ * 1. history.add(user)                                    本轮输入入历史
+ * 2. history.size() &gt; {@link #MAX_ROUNDS} * 2 ?            超阈值就压缩
+ *      └─ {@link Impl#compress()}  弹出最旧 2 条
+ *           → {@link Impl#clip(String)} 截断拼接 → 追加进 {@link Impl#summary}
+ * 3. 组装 context = [system 提示词] + [system 历史摘要] + history
+ * 4. model.chat(context) → 回答再 history.add(assistant) → 返回
+ * </pre>
+ * 其中 {@link Impl#compress()} 做的是「截断拼接」（{@link Impl#clip(String)}
+ * 压空白 + 超 40 字砍掉），<b>并未调用模型</b>；真正的「模型摘要」需要额外一次
+ * {@link ChatModel#chat(List)}。另外 {@link Impl#summary} 只增不减，
+ * 窗口只是把增长从 {@link Impl#history} 挪到了 {@link Impl#summary}。
  */
 public interface MemoryAgent extends Agent {
 
@@ -76,7 +90,12 @@ public interface MemoryAgent extends Agent {
             return answer;
         }
 
-        /** 上下文压缩：把最旧两轮摘成一句话，历史重新滑窗。 */
+        /**
+         * 上下文压缩：弹出最旧两轮，截断拼接成一条，追加进 {@link #summary}。
+         * <p>
+         * 注意这里是「截断拼接」而非「模型摘要」——全程不调用 {@link #model}，
+         * 真要摘要得在这里额外发一次 {@link ChatModel#chat(List)}。
+         */
         private void compress() {
             Message old1 = history.remove(0);
             Message old2 = history.remove(0);
@@ -88,6 +107,7 @@ public interface MemoryAgent extends Agent {
                     "detail", "最旧 2 轮已摘要化，摘要长度 " + summary.length() + " 字符"));
         }
 
+        /** 压掉多余空白，超 40 字截断加省略号——只负责截断，不调用模型。 */
         private String clip(String s) {
             String one = s.replaceAll("\\s+", " ").trim();
             return one.length() > 40 ? one.substring(0, 40) + "…" : one;

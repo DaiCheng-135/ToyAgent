@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "hello-java": {
+      "command": "java",
+      "args": ["-jar", "E:/run/dev/project_run/ToyAgent/target/hello-mcp.jar"]
+    }
+  }
+}

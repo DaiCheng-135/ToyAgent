@@ -39,6 +39,9 @@ public interface SkillAgent extends Agent {
                 - free_chat(L0): 自由聊天 —— 纯提示词技能，直接回答
 
                 根据用户输入只输出 JSON：{"skill": "技能名", "reason": "一句话理由"}
+                
+                
+                
                 """;
 
         public Impl(ChatModel model) {

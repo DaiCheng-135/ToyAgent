@@ -49,6 +49,18 @@ public interface Agent {
 
 每个场景一个文件，位于 `src/main/java/cn/xiaofuge/ai/agent/stepXX/`，接口注释即教程，嵌套实现类即全部逻辑。
 
+### 博客文档约定
+
+为某个场景写博客（学习笔记）时，博客文件与源码文件 **同目录、同名**，仅扩展名换成 `.md`：
+
+```
+agent/step14/
+├── A2AAgent.java      ← 源码
+└── A2AAgent.md        ← 配套博客（A2AAgent.java → A2AAgent.md）
+```
+
+博客里可自由引用源码行号（如 `A2AAgent.java:49`），与代码一一对照。
+
 ## 快速开始
 
 ### 方式一：零依赖运行（推荐，无需 Maven）

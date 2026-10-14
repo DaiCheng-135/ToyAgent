@@ -35,6 +35,15 @@ public interface SubagentAgent extends Agent {
 
     class Impl implements SubagentAgent {
 
+        private static final String SYSTEM_PROMPT_PREFIX = """
+                你是主智能体，可以把子任务委托给子代理。可用子代理：
+                - researcher：调研汇总
+                - writer：文案写作
+                派遣方式：spawn = 全新实例（无父会话上下文）；fork = 继承父会话上下文。
+                需要委托时只输出 JSON：{"tool": "dispatch_subagent", "name": "researcher", "mode": "spawn", "task": "子任务描述"}
+                不需要委托时，直接用自然语言回答，不要输出 JSON。
+                """;
+
         /** 子代理档案：职责提示词（真实场景里每个子代理还可挂自己的工具集）。 */
         private record ChildSpec(String specialty) {}
 
@@ -120,15 +129,6 @@ public interface SubagentAgent extends Agent {
                     "detail", name + " 收到任务「" + task + "」，上下文 " + (fork ? "继承父会话 " + parentTranscript.size() + " 条" : "全新（0 条历史）")));
             return report;
         }
-
-        private static final String SYSTEM_PROMPT_PREFIX = """
-                你是主智能体，可以把子任务委托给子代理。可用子代理：
-                - researcher：调研汇总
-                - writer：文案写作
-                派遣方式：spawn = 全新实例（无父会话上下文）；fork = 继承父会话上下文。
-                需要委托时只输出 JSON：{"tool": "dispatch_subagent", "name": "researcher", "mode": "spawn", "task": "子任务描述"}
-                不需要委托时，直接用自然语言回答，不要输出 JSON。
-                """;
 
         @Override
         public void reset() {
